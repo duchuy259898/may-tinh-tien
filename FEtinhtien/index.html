@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Máy Tính Tiền Của Mẹ</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        body {
+            margin: 0;
+            padding: 16px;
+            background-color: #f2f4f8;
+            color: #222;
+        }
+        h2 {
+            text-align: center;
+            color: #d32f2f;
+            margin: 8px 0 16px 0;
+            font-size: 26px;
+            font-weight: 800;
+        }
+        .card {
+            background: #ffffff;
+            padding: 16px;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+            margin-bottom: 16px;
+        }
+        label {
+            font-size: 17px;
+            font-weight: 700;
+            display: block;
+            margin-bottom: 6px;
+            color: #333;
+        }
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 20px;
+            border: 2px solid #ced4da;
+            border-radius: 10px;
+            margin-bottom: 12px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus {
+            border-color: #007aff;
+            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+        }
+
+        /* Phím tắt nhanh cho mẹ */
+        .quick-tags {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .btn-quick {
+            background: #f0f4f9;
+            color: #1a73e8;
+            border: 1px solid #d2e3fc;
+            padding: 10px 4px;
+            font-size: 16px;
+            font-weight: 700;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+        }
+        .btn-quick:active {
+            background: #d2e3fc;
+            transform: scale(0.96);
+        }
+
+        button {
+            width: 100%;
+            padding: 16px;
+            font-size: 19px;
+            font-weight: 800;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.15s ease-in-out;
+        }
+        .btn-add {
+            background-color: #2e7d32;
+            color: #ffffff;
+            box-shadow: 0 4px 8px rgba(46, 125, 50, 0.3);
+        }
+        .btn-add:active {
+            background-color: #1b5e20;
+            transform: scale(0.98);
+        }
+        
+        .btn-invoice {
+            background: linear-gradient(135deg, #0288d1, #01579b);
+            color: white;
+            box-shadow: 0 4px 10px rgba(2, 136, 209, 0.35);
+            margin-bottom: 14px;
+        }
+        .btn-invoice:active {
+            background: #014377;
+            transform: scale(0.98);
+        }
+
+        .btn-clear {
+            background-color: #c62828;
+            color: white;
+            margin-top: 12px;
+            padding: 14px;
+            font-size: 17px;
+        }
+        .btn-clear:active {
+            background-color: #8e0000;
+            transform: scale(0.98);
+        }
+
+        /* Khối hiển thị tổng tiền phía trên */
+        .total-box {
+            background: linear-gradient(135deg, #fff9e6, #fff3cd);
+            border: 2.5px solid #ffe8a1;
+            padding: 16px 12px;
+            border-radius: 16px;
+            text-align: center;
+            margin-bottom: 14px;
+            box-shadow: 0 4px 10px rgba(255, 193, 7, 0.2);
+        }
+        .total-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #856404;
+            letter-spacing: 0.5px;
+        }
+        .total-amount {
+            font-size: 40px;
+            font-weight: 900;
+            color: #d32f2f;
+            margin-top: 6px;
+        }
+
+        /* Hàng tiêu đề danh sách: Tên danh sách bên trái, "Thành tiền" bên phải */
+        .list-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 8px;
+        }
+        .header-col-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+        .col-price-title {
+            font-size: 15px;
+            font-weight: 800;
+            color: #555;
+            text-align: right;
+            min-width: 90px;
+        }
+        .col-spacer {
+            width: 58px;
+            display: inline-block;
+        }
+
+        /* Danh sách món: Tên bên trái, Giá tiền bên phải, dưới là tổng tiền */
+        .list-container {
+            max-height: 260px;
+            overflow-y: auto;
+            border-top: 1px solid #eee;
+            padding-top: 4px;
+        }
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 18px;
+        }
+        .item-col-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            overflow: hidden;
+            padding-right: 10px;
+        }
+        .item-num {
+            display: inline-block;
+            background: #e8f0fe;
+            color: #1a73e8;
+            font-size: 14px;
+            font-weight: 800;
+            padding: 3px 8px;
+            border-radius: 6px;
+            border: 1px solid #c2e7ff;
+            flex-shrink: 0;
+        }
+        .item-name {
+            font-weight: 700;
+            color: #111;
+            word-break: break-word;
+        }
+        .item-col-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+        .item-price {
+            color: #d32f2f;
+            font-weight: 700;
+            font-size: 18px;
+            white-space: nowrap;
+            text-align: right;
+            min-width: 90px;
+        }
+        .btn-del {
+            background: #ff4d4d;
+            color: white;
+            border: none;
+            padding: 8px 0;
+            width: 58px;
+            text-align: center;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .btn-del:active {
+            background: #c50e29;
+            transform: scale(0.95);
+        }
+
+        /* Khung tóm tắt vàng dưới cùng danh sách */
+        .cart-summary-footer {
+            background: #fff9e6;
+            border: 1.5px solid #ffe8a1;
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-top: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .summary-count-box {
+            font-size: 16px;
+            font-weight: 700;
+            color: #333;
+        }
+        .summary-count-val {
+            color: #1a73e8;
+            font-size: 18px;
+            font-weight: 800;
+        }
+        .summary-total-box {
+            font-size: 16px;
+            font-weight: 700;
+            color: #333;
+            text-align: right;
+        }
+        .summary-total-val {
+            color: #d32f2f;
+            font-size: 20px;
+            font-weight: 900;
+        }
+
+        /* Modal lớp phủ chung */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.65);
+            z-index: 999;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        /* Khung Hóa Đơn Chuẩn Bán Lẻ Siêu Đẹp */
+        .receipt-card {
+            background: #ffffff;
+            border-radius: 16px;
+            max-width: 380px;
+            width: 100%;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.3);
+            overflow: hidden;
+            animation: popIn 0.2s ease-out;
+        }
+        @keyframes popIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .receipt-paper {
+            padding: 24px 20px 16px 20px;
+            background: #fff;
+            color: #111;
+        }
+        .receipt-header {
+            text-align: center;
+            margin-bottom: 12px;
+        }
+        .receipt-shop-name {
+            font-size: 22px;
+            font-weight: 900;
+            color: #111;
+            letter-spacing: 0.5px;
+        }
+        .receipt-badge {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #0288d1;
+            font-size: 14px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 20px;
+            margin-top: 4px;
+        }
+        .receipt-datetime {
+            font-size: 14px;
+            color: #666;
+            margin-top: 8px;
+        }
+
+        .receipt-dashed {
+            border-top: 1.5px dashed #bbb;
+            margin: 12px 0;
+        }
+        .receipt-dashed-double {
+            border-top: 2.5px dashed #333;
+            margin: 14px 0 10px 0;
+        }
+
+        .receipt-table-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            font-weight: 700;
+            color: #777;
+            text-transform: uppercase;
+            padding-bottom: 6px;
+        }
+        .receipt-list {
+            max-height: 260px;
+            overflow-y: auto;
+        }
+        .receipt-item-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 7px 0;
+            border-bottom: 1px dotted #e6e6e6;
+            font-size: 16px;
+        }
+        .receipt-item-name {
+            font-weight: 600;
+            color: #222;
+            word-break: break-word;
+            padding-right: 10px;
+        }
+        .receipt-item-price {
+            font-weight: 700;
+            color: #111;
+            white-space: nowrap;
+        }
+
+        .receipt-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 6px;
+        }
+        .receipt-total-label {
+            font-size: 18px;
+            font-weight: 900;
+            color: #111;
+        }
+        .receipt-count-note {
+            font-size: 13px;
+            color: #666;
+            font-weight: 600;
+        }
+        .receipt-total-val {
+            font-size: 26px;
+            font-weight: 900;
+            color: #d32f2f;
+        }
+
+        .receipt-note {
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+            font-style: italic;
+            margin-top: 14px;
+        }
+
+        /* Nút thao tác dưới hóa đơn */
+        .receipt-btn-group {
+            background: #f8f9fa;
+            padding: 14px 20px 20px 20px;
+            border-top: 1px solid #eee;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .btn-share {
+            background: #0288d1;
+            color: white;
+            padding: 14px;
+            font-size: 17px;
+        }
+        .btn-share:active {
+            background: #026aa7;
+        }
+        .btn-close-receipt {
+            background: #6c757d;
+            color: white;
+            padding: 12px;
+            font-size: 16px;
+        }
+        .btn-close-receipt:active {
+            background: #545b62;
+        }
+
+        /* Hộp thoại xác nhận xóa */
+        .modal-content {
+            background: white;
+            padding: 24px 20px;
+            border-radius: 18px;
+            text-align: center;
+            max-width: 340px;
+            width: 100%;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+        }
+        .modal-title {
+            font-size: 20px;
+            font-weight: 800;
+            color: #d32f2f;
+            margin-bottom: 12px;
+        }
+        .modal-desc {
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 20px;
+            line-height: 1.4;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .btn-cancel {
+            background: #e0e0e0;
+            color: #333;
+            flex: 1;
+            padding: 12px;
+            font-size: 16px;
+        }
+        .btn-confirm {
+            background: #d32f2f;
+            color: white;
+            flex: 1;
+            padding: 12px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>MÁY TÍNH TIỀN CỦA MẸ</h2>
+
+    <!-- Khu vực nhập liệu -->
+    <div class="card">
+        <label for="itemName">Tên món (Có thể bỏ trống):</label>
+        <input type="text" id="itemName" placeholder="Ví dụ: Kẹo, Bánh, Nước...">
+
+        <label for="itemPrice">Giá tiền (VNĐ):</label>
+        <input type="text" id="itemPrice" inputmode="numeric" placeholder="Ví dụ: 20,000" oninput="onPriceInput(this)" onkeydown="handleKeyDown(event)">
+
+        <!-- Phím tắt nhanh cho mẹ -->
+        <div class="quick-tags">
+            <button type="button" class="btn-quick" onclick="addZeros('000')">+000</button>
+            <button type="button" class="btn-quick" onclick="setQuickPrice(10000)">10k</button>
+            <button type="button" class="btn-quick" onclick="setQuickPrice(20000)">20k</button>
+            <button type="button" class="btn-quick" onclick="setQuickPrice(50000)">50k</button>
+        </div>
+
+        <button type="button" class="btn-add" onclick="addItem()">➕ THÊM VÀO GIỎ (ENTER)</button>
+    </div>
+
+    <!-- Hiển thị tổng tiền phía trên -->
+    <div class="total-box">
+        <div class="total-title">TỔNG TIỀN PHẢI TRẢ</div>
+        <div class="total-amount" id="totalMoney">0 đ</div>
+    </div>
+
+    <!-- Nút Xuất Hóa Đơn Nổi Bật -->
+    <button type="button" class="btn-invoice" onclick="openReceiptModal()">🧾 XUẤT HÓA ĐƠN (GỬI KHÁCH)</button>
+
+    <!-- Danh sách các món đã chọn -->
+    <div class="card">
+        <!-- Hàng tiêu đề: Danh sách bên trái, Thành tiền bên phải -->
+        <div class="list-header-row">
+            <label style="margin: 0;">Danh sách món khách mua:</label>
+            <div class="header-col-right">
+                <span class="col-price-title">Thành tiền</span>
+                <span class="col-spacer"></span>
+            </div>
+        </div>
+
+        <div class="list-container" id="itemList">
+            <!-- Dữ liệu hiển thị ở đây -->
+        </div>
+
+        <!-- Khung tóm tắt Tổng số món và Tổng tiền ngay bên dưới danh sách -->
+        <div class="cart-summary-footer" id="cartSummaryFooter">
+            <div class="summary-count-box">
+                Tổng số món: <span class="summary-count-val" id="summaryTotalItems">0 món</span>
+            </div>
+            <div class="summary-total-box">
+                Tổng tiền: <span class="summary-total-val" id="summaryTotalPrice">0 đ</span>
+            </div>
+        </div>
+
+        <button type="button" class="btn-clear" onclick="openConfirmModal()">🗑️ XÓA HẾT (TÍNH KHÁCH MỚI)</button>
+    </div>
+
+    <!-- ================= MODAL HÓA ĐƠN BÁN LẺ ================= -->
+    <div class="modal-overlay" id="receiptModal">
+        <div class="receipt-card">
+            <!-- Bản hóa đơn giấy trắng để chụp ảnh -->
+            <div class="receipt-paper" id="receiptPaper">
+                <div class="receipt-header">
+                    <div class="receipt-shop-name">HÓA ĐƠN BÁN HÀNG</div>
+                    <div class="receipt-badge">PHIẾU TÍNH TIỀN</div>
+                    <div class="receipt-datetime" id="receiptDateTime">Ngày: --/--/---- --:--</div>
+                </div>
+
+                <div class="receipt-dashed"></div>
+
+                <div class="receipt-table-header">
+                    <span>Sản phẩm</span>
+                    <span>Thành tiền</span>
+                </div>
+
+                <div class="receipt-list" id="receiptItemList">
+                    <!-- Danh sách món hóa đơn -->
+                </div>
+
+                <div class="receipt-dashed-double"></div>
+
+                <div class="receipt-summary">
+                    <div>
+                        <div class="receipt-total-label">TỔNG CỘNG:</div>
+                        <div class="receipt-count-note" id="receiptCountNote">Tổng: 0 món</div>
+                    </div>
+                    <span class="receipt-total-val" id="receiptTotalVal">0 đ</span>
+                </div>
+
+                <div class="receipt-note">
+                    ❤️ Cảm ơn quý khách và hẹn gặp lại! ❤️
+                </div>
+            </div>
+
+            <!-- Nút chia sẻ / đóng hóa đơn -->
+            <div class="receipt-btn-group">
+                <button type="button" class="btn-share" onclick="shareOrCopyReceipt()">📲 GỬI QUA ZALO / SAO CHÉP</button>
+                <button type="button" class="btn-close-receipt" onclick="closeReceiptModal()">QUAY LẠI BÁN TIẾP</button>
+                <div style="font-size: 13px; color: #666; text-align: center; margin-top: 4px;">
+                    📸 <i>Mẹo: Mẹ có thể bấm Nguồn + Tăng âm lượng để chụp ảnh màn hình hóa đơn này gửi cho khách nhé!</i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hộp thoại xác nhận xóa hết -->
+    <div class="modal-overlay" id="confirmModal">
+        <div class="modal-content">
+            <div class="modal-title">XÓA TẤT CẢ?</div>
+            <div class="modal-desc">Bạn có chắc muốn xóa hết danh sách để tính cho khách mới không?</div>
+            <div class="modal-actions">
+                <button type="button" class="btn-cancel" onclick="closeConfirmModal()">HỦY BỎ</button>
+                <button type="button" class="btn-confirm" onclick="confirmClearAll()">XÓA HẾT</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let cart = JSON.parse(localStorage.getItem('cart_data')) || [];
+
+        // Định dạng dấu phẩy phân cách hàng nghìn (Ví dụ: 20000 -> 20,000)
+        function formatNumberWithCommas(val) {
+            if (!val && val !== 0) return '';
+            const numStr = String(val).replace(/\D/g, '');
+            if (!numStr) return '';
+            return numStr.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+
+        // Định dạng kèm chữ đ (Ví dụ: 20000 -> 20,000 đ)
+        function formatMoney(amount) {
+            return (formatNumberWithCommas(Math.round(amount || 0)) || '0') + ' đ';
+        }
+
+        // Tự động thêm dấu phẩy ngay khi đang gõ
+        function onPriceInput(input) {
+            input.value = formatNumberWithCommas(input.value);
+        }
+
+        function renderCart() {
+            const listContainer = document.getElementById('itemList');
+            const totalMoneyElem = document.getElementById('totalMoney');
+            const summaryTotalItems = document.getElementById('summaryTotalItems');
+            const summaryTotalPrice = document.getElementById('summaryTotalPrice');
+            
+            listContainer.innerHTML = '';
+            let total = 0;
+
+            if (cart.length === 0) {
+                listContainer.innerHTML = '<p style="text-align: center; color: #888; font-size: 16px; margin: 16px 0;">Chưa có món nào được thêm</p>';
+                if (summaryTotalItems) summaryTotalItems.innerText = '0 món';
+                if (summaryTotalPrice) summaryTotalPrice.innerText = '0 đ';
+            } else {
+                if (summaryTotalItems) summaryTotalItems.innerText = cart.length + ' món';
+            }
+
+            cart.forEach((item, index) => {
+                total += Number(item.price);
+                const row = document.createElement('div');
+                row.className = 'item-row';
+                row.innerHTML = `
+                    <div class="item-col-left">
+                        <span class="item-num">#${index + 1}</span>
+                        <span class="item-name">${item.name}</span>
+                    </div>
+                    <div class="item-col-right">
+                        <span class="item-price">${formatMoney(item.price)}</span>
+                        <button type="button" class="btn-del" onclick="removeItem(${index})">Xóa</button>
+                    </div>
+                `;
+                listContainer.appendChild(row);
+            });
+
+            const formattedTotal = formatMoney(total);
+            totalMoneyElem.innerText = formattedTotal;
+            if (summaryTotalPrice) summaryTotalPrice.innerText = formattedTotal;
+            localStorage.setItem('cart_data', JSON.stringify(cart));
+        }
+
+        function addItem() {
+            const nameInput = document.getElementById('itemName');
+            const priceInput = document.getElementById('itemPrice');
+            
+            const name = nameInput.value.trim();
+            const rawPrice = priceInput.value.replace(/\D/g, '');
+
+            if (!rawPrice || Number(rawPrice) <= 0) {
+                alert('Mẹ ơi, vui lòng nhập giá tiền nhé!');
+                priceInput.focus();
+                return;
+            }
+
+            cart.push({
+                name: name ? name : `Món ${cart.length + 1}`,
+                price: parseFloat(rawPrice)
+            });
+
+            nameInput.value = '';
+            priceInput.value = '';
+            priceInput.focus();
+
+            renderCart();
+        }
+
+        function handleKeyDown(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                addItem();
+            }
+        }
+
+        function addZeros(zeros) {
+            const priceInput = document.getElementById('itemPrice');
+            let current = priceInput.value.replace(/\D/g, '');
+            current = current ? current + zeros : '1' + zeros;
+            priceInput.value = formatNumberWithCommas(current);
+            priceInput.focus();
+        }
+
+        function setQuickPrice(val) {
+            const priceInput = document.getElementById('itemPrice');
+            priceInput.value = formatNumberWithCommas(val);
+            priceInput.focus();
+        }
+
+        function removeItem(index) {
+            cart.splice(index, 1);
+            renderCart();
+        }
+
+        // ================= HÓA ĐƠN =================
+        function openReceiptModal() {
+            if (cart.length === 0) {
+                alert('Mẹ ơi, chưa có món nào trong giỏ để xuất hóa đơn nhé!');
+                return;
+            }
+
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('receiptDateTime').innerText = `Ngày: ${dateStr} - Giờ: ${timeStr}`;
+
+            const receiptList = document.getElementById('receiptItemList');
+            receiptList.innerHTML = '';
+            let total = 0;
+
+            cart.forEach((item, index) => {
+                total += Number(item.price);
+                const row = document.createElement('div');
+                row.className = 'receipt-item-row';
+                row.innerHTML = `
+                    <span class="receipt-item-name">${index + 1}. ${item.name}</span>
+                    <span class="receipt-item-price">${formatMoney(item.price)}</span>
+                `;
+                receiptList.appendChild(row);
+            });
+
+            document.getElementById('receiptTotalVal').innerText = formatMoney(total);
+            const countNote = document.getElementById('receiptCountNote');
+            if (countNote) countNote.innerText = `Tổng: ${cart.length} món`;
+
+            document.getElementById('receiptModal').style.display = 'flex';
+        }
+
+        function closeReceiptModal() {
+            document.getElementById('receiptModal').style.display = 'none';
+        }
+
+        function shareOrCopyReceipt() {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+            let text = `🧾 HÓA ĐƠN BÁN HÀNG\n`;
+            text += `⏰ Thời gian: ${dateStr} lúc ${timeStr}\n`;
+            text += `📦 Tổng số món: ${cart.length} món\n`;
+            text += `--------------------------------\n`;
+
+            let total = 0;
+            cart.forEach((item, index) => {
+                total += Number(item.price);
+                text += `${index + 1}. ${item.name}: ${formatMoney(item.price)}\n`;
+            });
+
+            text += `--------------------------------\n`;
+            text += `👉 TỔNG TIỀN: ${formatMoney(total)}\n`;
+            text += `❤️ Cảm ơn quý khách!`;
+
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Hóa đơn bán hàng',
+                    text: text
+                }).catch(() => {});
+            } else if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    alert('Đã sao chép hóa đơn! Mẹ chỉ cần mở Zalo/Tin nhắn bấm Dán (Paste) để gửi cho khách nhé!');
+                }).catch(() => {
+                    alert('Mẹ bấm phím Nguồn + Tăng âm lượng để chụp ảnh màn hình gửi khách nhé!');
+                });
+            } else {
+                alert('Mẹ bấm phím Nguồn + Tăng âm lượng để chụp ảnh màn hình gửi khách nhé!');
+            }
+        }
+
+        // ================= XÓA HẾT =================
+        function openConfirmModal() {
+            if (cart.length === 0) return;
+            document.getElementById('confirmModal').style.display = 'flex';
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirmModal').style.display = 'none';
+        }
+
+        function confirmClearAll() {
+            cart = [];
+            renderCart();
+            closeConfirmModal();
+        }
+
+        // Chạy lần đầu khi mở app
+        renderCart();
+    </script>
+</body>
+</html>

@@ -747,51 +747,180 @@
             return recog;
         }
 
-        // Bóc tách tên món và giá tiền nếu mẹ đọc gộp cả 2
-        function parseVoicePriceAndName(str) {
-            const regex = /(.*?)\s+(\d+[\d.,]*)\s*(nghìn|ngàn|k|đ|đồng)?$/i;
-            const match = str.match(regex);
-            if (match) {
-                let name = match[1].trim();
-                let numStr = match[2].replace(/[.,]/g, '');
-                let unit = (match[3] || '').toLowerCase();
-                let price = parseFloat(numStr);
+        // Kiểm tra xem 1 từ có phải từ chỉ số trong tiếng Việt hay không
+        function isNumberWord(w) {
+            if (!w) return false;
+            w = w.toLowerCase().replace(/[.,]/g, '');
+            if (!isNaN(w)) return true;
+            if (/^\d+(k|tr|triệu|nghìn|ngàn|đ)?$/i.test(w)) return true;
+            const numberTokens = new Set([
+                'không', 'một', 'mốt', 'hai', 'ba', 'bốn', 'tư',
+                'năm', 'lăm', 'nhăm', 'sáu', 'bảy', 'bẩy', 'tám', 'chín',
+                'mười', 'mươi', 'chục', 'trăm', 'nghìn', 'ngàn', 'k', 'triệu', 'củ', 'tr', 'linh', 'lẻ', 'đồng', 'đ'
+            ]);
+            return numberTokens.has(w);
+        }
 
-                if (price > 0) {
-                    if (unit === 'k' || unit === 'nghìn' || unit === 'ngàn') {
-                        if (price < 1000) price = price * 1000;
-                    } else if (!unit && price < 1000) {
-                        if (price <= 500) price = price * 1000;
+        // Chuyển đổi toàn bộ cụm từ chỉ số tiếng Việt sang số thực
+        // Ví dụ: 'tám trăm linh năm nghìn' -> 805000, 'hai trăm bảy mươi nghìn' -> 270000, '20k' -> 20000
+        function parseVietnameseNumberPhrase(str) {
+            if (!str) return null;
+            str = str.toLowerCase().trim();
+
+            // Xử lý các trường hợp Siri chuyển đổi dở dang như '80 lăm' -> '85'
+            str = str.replace(/(\d+)\s+lăm/g, (m, d) => (parseInt(d) + 5));
+            str = str.replace(/(\d+)\s+mốt/g, (m, d) => (parseInt(d) + 1));
+            str = str.replace(/(\d+)\s+tư/g, (m, d) => (parseInt(d) + 4));
+
+            let direct = str.match(/^(\d+[\d.,]*)\s*(triệu|củ|tr|nghìn|ngàn|k)?$/i);
+            if (direct) {
+                let val = parseFloat(direct[1].replace(/[.,]/g, ''));
+                let unit = (direct[2] || '').toLowerCase();
+                if (unit === 'triệu' || unit === 'củ' || unit === 'tr') return val * 1000000;
+                if (unit === 'nghìn' || unit === 'ngàn' || unit === 'k') return (val < 1000 ? val * 1000 : val);
+                if (val < 1000) return val * 1000;
+                return val;
+            }
+
+            const digits = {
+                'không': 0, 'một': 1, 'mốt': 1, 'hai': 2, 'ba': 3, 'bốn': 4, 'tư': 4,
+                'năm': 5, 'lăm': 5, 'nhăm': 5, 'sáu': 6, 'bảy': 7, 'bẩy': 7, 'tám': 8, 'chín': 9
+            };
+
+            const words = str.split(/\s+/);
+            if (words.length === 1 && !digits[words[0]] && isNaN(words[0])) return null;
+
+            let total = 0;
+            let group = 0;
+            let current = 0;
+            let hasActualNumber = false;
+
+            for (let i = 0; i < words.length; i++) {
+                let w = words[i];
+                if (!isNaN(w)) {
+                    hasActualNumber = true;
+                    let num = parseFloat(w);
+                    if (num >= 1000) {
+                        total += num;
+                    } else {
+                        current += num;
                     }
-                    return { name: name || str, price: price };
+                } else if (digits[w] !== undefined) {
+                    hasActualNumber = true;
+                    current += digits[w];
+                } else if (w === 'trăm') {
+                    hasActualNumber = true;
+                    let h = current > 0 ? current : 1;
+                    group += h * 100;
+                    current = 0;
+                } else if (w === 'mươi' || w === 'chục') {
+                    hasActualNumber = true;
+                    let t = current > 0 ? current : 1;
+                    group += t * 10;
+                    current = 0;
+                } else if (w === 'mười') {
+                    hasActualNumber = true;
+                    group += 10;
+                    current = 0;
+                } else if (w === 'linh' || w === 'lẻ') {
+                    // Cầu nối
+                } else if (w === 'nghìn' || w === 'ngàn' || w === 'k') {
+                    hasActualNumber = true;
+                    group += current;
+                    total += (group > 0 ? group : 1) * 1000;
+                    group = 0;
+                    current = 0;
+                } else if (w === 'triệu' || w === 'củ' || w === 'tr') {
+                    hasActualNumber = true;
+                    group += current;
+                    total += (group > 0 ? group : 1) * 1000000;
+                    group = 0;
+                    current = 0;
+                } else if (w === 'đồng' || w === 'đ') {
+                    // Bỏ qua
+                } else {
+                    return null;
                 }
             }
-            return { name: str, price: null };
+            if (!hasActualNumber) return null;
+            group += current;
+            total += group;
+
+            if (total > 0 && total < 1000) {
+                total *= 1000;
+            }
+            return total > 0 ? total : null;
+        }
+
+        // Tách chuỗi giọng nói thành Tên món và Giá tiền
+        function extractNameAndPrice(speechText) {
+            if (!speechText) return { name: '', price: null };
+            let text = speechText.trim();
+
+            // 1. Trường hợp cả câu nói là số tiền (ví dụ: 'tám trăm linh năm nghìn', '20k')
+            let wholePrice = parseVietnameseNumberPhrase(text);
+            if (wholePrice !== null) {
+                return { name: '', price: wholePrice };
+            }
+
+            // 2. Tìm phần đuôi dài nhất là các từ chỉ số (ví dụ: 'Gia vị tám trăm linh năm nghìn')
+            let words = text.split(/\s+/);
+            let splitIdx = -1;
+            for (let i = words.length - 1; i >= 0; i--) {
+                if (isNumberWord(words[i])) {
+                    splitIdx = i;
+                } else {
+                    break;
+                }
+            }
+
+            if (splitIdx > 0) {
+                let candidateName = words.slice(0, splitIdx).join(' ');
+                let candidateNumber = words.slice(splitIdx).join(' ');
+                let price = parseVietnameseNumberPhrase(candidateNumber);
+                if (price !== null) {
+                    return { name: candidateName, price: price };
+                }
+            }
+
+            return { name: text, price: null };
+        }
+
+        function capitalizeFirst(s) {
+            if (!s) return '';
+            return s.charAt(0).toUpperCase() + s.slice(1);
         }
 
         function handleSpeechResult(rawText) {
             if (!rawText) return;
             let text = rawText.trim();
-            text = text.charAt(0).toUpperCase() + text.slice(1);
 
-            const parsed = parseVoicePriceAndName(text);
+            const parsed = extractNameAndPrice(text);
             const nameInput = document.getElementById('itemName');
             const priceInput = document.getElementById('itemPrice');
 
-            if (parsed.price && priceInput) {
-                nameInput.value = parsed.name || text;
+            if (parsed.price !== null) {
+                if (parsed.name) {
+                    // Mẹ đọc cả tên món lẫn giá tiền: ví dụ 'Gia vị tám trăm linh năm nghìn'
+                    nameInput.value = capitalizeFirst(parsed.name);
+                }
+                // Cập nhật giá tiền
                 priceInput.value = formatNumberWithCommas(parsed.price);
                 priceInput.focus();
             } else {
-                nameInput.value = text;
+                // Mẹ chỉ đọc tên món: ví dụ 'Gia vị'
+                nameInput.value = capitalizeFirst(text);
                 if (priceInput) priceInput.focus();
             }
 
             const hint = document.getElementById('voiceStatusHint');
             if (hint) {
                 hint.classList.add('active');
-                hint.innerHTML = `✅ Đã nhập: <b>${nameInput.value}</b>` + (parsed.price ? ` - Giá: <b>${formatMoney(parsed.price)}</b>` : '');
-                setTimeout(() => { hint.classList.remove('active'); }, 3500);
+                let statusMsg = '✅ ';
+                if (nameInput.value) statusMsg += `Tên: <b>${nameInput.value}</b> `;
+                if (parsed.price !== null) statusMsg += (nameInput.value ? '| ' : '') + `Giá: <b>${formatMoney(parsed.price)}</b>`;
+                hint.innerHTML = statusMsg;
+                setTimeout(() => { hint.classList.remove('active'); }, 4000);
             }
         }
 

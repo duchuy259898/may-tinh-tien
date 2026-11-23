@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Máy Tính Tiền Và Xuất Hóa Đon</title>
+    <title>Máy Tính Tiền Của Mẹ</title>
     <style>
         * {
             box-sizing: border-box;
@@ -50,6 +50,62 @@
         input:focus {
             border-color: #007aff;
             box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+        }
+
+        /* Nút nhập giọng nói phong cách Zalo */
+        .input-voice-wrapper {
+            display: flex;
+            gap: 8px;
+            align-items: stretch;
+            margin-bottom: 8px;
+        }
+        .input-voice-wrapper input {
+            margin-bottom: 0;
+            flex: 1;
+        }
+        .btn-voice {
+            width: auto;
+            padding: 0 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            background: linear-gradient(135deg, #0288d1, #01579b);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 800;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 6px rgba(2, 136, 209, 0.3);
+            min-height: 52px;
+        }
+        .btn-voice:active {
+            transform: scale(0.96);
+        }
+        .btn-voice.recording {
+            background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+            box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.35);
+            animation: pulse-red 1.2s infinite;
+        }
+        @keyframes pulse-red {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.04); }
+            100% { transform: scale(1); }
+        }
+        .voice-status-hint {
+            font-size: 14px;
+            color: #0284c7;
+            font-weight: 600;
+            margin-bottom: 12px;
+            min-height: 18px;
+            display: none;
+            line-height: 1.4;
+        }
+        .voice-status-hint.active {
+            display: block;
         }
 
         /* Phím tắt nhanh cho mẹ */
@@ -168,7 +224,7 @@
 
         /* Danh sách món: Tên bên trái, Giá tiền bên phải, dưới là tổng tiền */
         .list-container {
-            max-height: 260px;
+            max-height: 420px;
             overflow-y: auto;
             border-top: 1px solid #eee;
             padding-top: 4px;
@@ -177,7 +233,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 12px 0;
+            padding: 10px 0;
             border-bottom: 1px solid #f0f0f0;
             font-size: 18px;
         }
@@ -472,12 +528,19 @@
 </head>
 <body>
 
-    <h2>MÁY TÍNH TIỀN VÀ XUẤT HÓA ĐƠN</h2>
+    <h2>MÁY TÍNH TIỀN CỦA MẸ</h2>
 
     <!-- Khu vực nhập liệu -->
     <div class="card">
-        <label for="itemName">Tên món (Có thể bỏ trống):</label>
-        <input type="text" id="itemName" placeholder="Ví dụ: Kẹo, Bánh, Nước...">
+        <label for="itemName">Tên món (Có thể gõ hoặc bấm nói):</label>
+        <div class="input-voice-wrapper">
+            <input type="text" id="itemName" placeholder="Ví dụ: Kẹo, Bánh, Nước...">
+            <button type="button" class="btn-voice" id="btnVoice" onclick="toggleVoiceRecognition()" title="Bấm để nói bằng giọng nói">
+                <span class="voice-wave-icon">🎙️</span>
+                <span class="voice-btn-label">Bấm nói</span>
+            </button>
+        </div>
+        <div class="voice-status-hint" id="voiceStatusHint"></div>
 
         <label for="itemPrice">Giá tiền (VNĐ):</label>
         <input type="text" id="itemPrice" inputmode="numeric" placeholder="Ví dụ: 20,000" oninput="onPriceInput(this)" onkeydown="handleKeyDown(event)">
@@ -490,7 +553,7 @@
             <button type="button" class="btn-quick" onclick="setQuickPrice(50000)">50k</button>
         </div>
 
-        <button type="button" class="btn-add" onclick="addItem()">➕ THÊM VÀO ĐƠN</button>
+        <button type="button" class="btn-add" onclick="addItem()">➕ THÊM VÀO GIỎ (ENTER)</button>
     </div>
 
     <!-- Hiển thị tổng tiền phía trên -->
@@ -527,7 +590,7 @@
             </div>
         </div>
 
-        <button type="button" class="btn-clear" onclick="openConfirmModal()">🗑️ XÓA HẾT (TÍNH ĐƠN MỚI)</button>
+        <button type="button" class="btn-clear" onclick="openConfirmModal()">🗑️ XÓA HẾT (TÍNH KHÁCH MỚI)</button>
     </div>
 
     <!-- ================= MODAL HÓA ĐƠN BÁN LẺ ================= -->
@@ -611,6 +674,167 @@
             input.value = formatNumberWithCommas(input.value);
         }
 
+        // ================= NHẬN DIỆN GIỌNG NÓI (VOICE TO TEXT) =================
+        let recognition = null;
+        let isRecording = false;
+
+        function initSpeechRecognition() {
+            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRec) {
+                return null;
+            }
+            const recog = new SpeechRec();
+            recog.lang = 'vi-VN';
+            recog.continuous = false;
+            recog.interimResults = true;
+            recog.maxAlternatives = 1;
+
+            recog.onstart = function() {
+                isRecording = true;
+                const btn = document.getElementById('btnVoice');
+                const hint = document.getElementById('voiceStatusHint');
+                const itemNameInput = document.getElementById('itemName');
+                if (btn) {
+                    btn.classList.add('recording');
+                    btn.innerHTML = '<span class="voice-wave-icon">🔴</span><span class="voice-btn-label">Đang nghe...</span>';
+                }
+                if (hint) {
+                    hint.classList.add('active');
+                    hint.innerHTML = '🎙️ Mẹ nói đi ạ: ví dụ <i>"Bánh mì 20 nghìn"</i> hoặc <i>"Nước ngọt"</i>...';
+                }
+                if (itemNameInput && !itemNameInput.value) {
+                    itemNameInput.placeholder = 'Đang lắng nghe mẹ nói...';
+                }
+            };
+
+            recog.onresult = function(event) {
+                let transcript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    transcript += event.results[i][0].transcript;
+                }
+                transcript = transcript.trim();
+                const hint = document.getElementById('voiceStatusHint');
+                if (hint && transcript) {
+                    hint.innerHTML = `👂 Mẹ vừa nói: <b>"${transcript}"</b>`;
+                }
+
+                if (event.results[0].isFinal) {
+                    handleSpeechResult(transcript);
+                }
+            };
+
+            recog.onerror = function(event) {
+                console.warn('Speech recognition error:', event.error);
+                stopVoiceRecognition();
+                const hint = document.getElementById('voiceStatusHint');
+                if (hint) {
+                    hint.classList.add('active');
+                    if (event.error === 'not-allowed') {
+                        hint.innerHTML = '⚠️ Mẹ vui lòng bấm "Cho phép" dùng Micro trên iPhone để nói nhé!';
+                    } else if (event.error === 'no-speech') {
+                        hint.innerHTML = 'Con chưa nghe rõ, mẹ bấm lại nút "Bấm nói" nhé!';
+                    } else {
+                        hint.innerHTML = 'Không nghe thấy, mẹ bấm thử lại nhé!';
+                    }
+                    setTimeout(() => { hint.classList.remove('active'); }, 4000);
+                }
+            };
+
+            recog.onend = function() {
+                stopVoiceRecognition();
+            };
+
+            return recog;
+        }
+
+        // Bóc tách tên món và giá tiền nếu mẹ đọc gộp cả 2
+        function parseVoicePriceAndName(str) {
+            const regex = /(.*?)\s+(\d+[\d.,]*)\s*(nghìn|ngàn|k|đ|đồng)?$/i;
+            const match = str.match(regex);
+            if (match) {
+                let name = match[1].trim();
+                let numStr = match[2].replace(/[.,]/g, '');
+                let unit = (match[3] || '').toLowerCase();
+                let price = parseFloat(numStr);
+
+                if (price > 0) {
+                    if (unit === 'k' || unit === 'nghìn' || unit === 'ngàn') {
+                        if (price < 1000) price = price * 1000;
+                    } else if (!unit && price < 1000) {
+                        if (price <= 500) price = price * 1000;
+                    }
+                    return { name: name || str, price: price };
+                }
+            }
+            return { name: str, price: null };
+        }
+
+        function handleSpeechResult(rawText) {
+            if (!rawText) return;
+            let text = rawText.trim();
+            text = text.charAt(0).toUpperCase() + text.slice(1);
+
+            const parsed = parseVoicePriceAndName(text);
+            const nameInput = document.getElementById('itemName');
+            const priceInput = document.getElementById('itemPrice');
+
+            if (parsed.price && priceInput) {
+                nameInput.value = parsed.name || text;
+                priceInput.value = formatNumberWithCommas(parsed.price);
+                priceInput.focus();
+            } else {
+                nameInput.value = text;
+                if (priceInput) priceInput.focus();
+            }
+
+            const hint = document.getElementById('voiceStatusHint');
+            if (hint) {
+                hint.classList.add('active');
+                hint.innerHTML = `✅ Đã nhập: <b>${nameInput.value}</b>` + (parsed.price ? ` - Giá: <b>${formatMoney(parsed.price)}</b>` : '');
+                setTimeout(() => { hint.classList.remove('active'); }, 3500);
+            }
+        }
+
+        function toggleVoiceRecognition() {
+            if (isRecording) {
+                stopVoiceRecognition();
+                return;
+            }
+
+            if (!recognition) {
+                recognition = initSpeechRecognition();
+            }
+
+            if (!recognition) {
+                alert('Tính năng giọng nói chạy tốt nhất trên Safari iOS (iPhone) hoặc Chrome/Edge. Mẹ mở bằng Safari trên iPhone để dùng nhé!');
+                return;
+            }
+
+            try {
+                recognition.start();
+            } catch (e) {
+                console.error(e);
+                stopVoiceRecognition();
+            }
+        }
+
+        function stopVoiceRecognition() {
+            isRecording = false;
+            if (recognition) {
+                try { recognition.stop(); } catch(e){}
+            }
+            const btn = document.getElementById('btnVoice');
+            if (btn) {
+                btn.classList.remove('recording');
+                btn.innerHTML = '<span class="voice-wave-icon">🎙️</span><span class="voice-btn-label">Bấm nói</span>';
+            }
+            const itemNameInput = document.getElementById('itemName');
+            if (itemNameInput && itemNameInput.placeholder.includes('Đang lắng nghe')) {
+                itemNameInput.placeholder = 'Ví dụ: Kẹo, Bánh, Nước...';
+            }
+        }
+
+        // ================= GIỎ HÀNG VÀ HÓA ĐƠN =================
         function renderCart() {
             const listContainer = document.getElementById('itemList');
             const totalMoneyElem = document.getElementById('totalMoney');
@@ -671,7 +895,7 @@
 
             nameInput.value = '';
             priceInput.value = '';
-            priceInput.focus();
+            nameInput.focus();
 
             renderCart();
         }

@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Máy Tính Tiền Của Mẹ</title>
+    <!-- Icon hiển thị ngoài màn hình chính iPhone -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23d32f2f'/><text x='50' y='68' font-size='56' text-anchor='middle'>🧾</text></svg>">
     <style>
         * {
             box-sizing: border-box;
@@ -534,7 +536,7 @@
     <div class="card">
         <label for="itemName">Tên món (Có thể gõ hoặc bấm nói):</label>
         <div class="input-voice-wrapper">
-            <input type="text" id="itemName" placeholder="Ví dụ: Kẹo, Bánh, Nước...">
+            <input type="text" id="itemName" placeholder="Ví dụ: Kẹo, Bánh, Nước..." oninput="onNameInputChanged(this)">
             <button type="button" class="btn-voice" id="btnVoice" onclick="toggleVoiceRecognition()" title="Bấm để nói bằng giọng nói">
                 <span class="voice-wave-icon">🎙️</span>
                 <span class="voice-btn-label">Bấm nói</span>
@@ -678,6 +680,9 @@
         let recognition = null;
         let isRecording = false;
 
+        let voiceStartTime = 0;
+        let voiceHasSpoken = false;
+
         function initSpeechRecognition() {
             const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRec) {
@@ -691,6 +696,8 @@
 
             recog.onstart = function() {
                 isRecording = true;
+                voiceStartTime = Date.now();
+                voiceHasSpoken = false;
                 const btn = document.getElementById('btnVoice');
                 const hint = document.getElementById('voiceStatusHint');
                 const itemNameInput = document.getElementById('itemName');
@@ -708,6 +715,7 @@
             };
 
             recog.onresult = function(event) {
+                voiceHasSpoken = true;
                 let transcript = '';
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
                     transcript += event.results[i][0].transcript;
@@ -726,22 +734,25 @@
             recog.onerror = function(event) {
                 console.warn('Speech recognition error:', event.error);
                 stopVoiceRecognition();
-                const hint = document.getElementById('voiceStatusHint');
-                if (hint) {
-                    hint.classList.add('active');
-                    if (event.error === 'not-allowed') {
-                        hint.innerHTML = '⚠️ Mẹ vui lòng bấm "Cho phép" dùng Micro trên iPhone để nói nhé!';
-                    } else if (event.error === 'no-speech') {
-                        hint.innerHTML = 'Con chưa nghe rõ, mẹ bấm lại nút "Bấm nói" nhé!';
-                    } else {
-                        hint.innerHTML = 'Không nghe thấy, mẹ bấm thử lại nhé!';
+                if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                    showIosKeyboardMicGuide();
+                } else {
+                    const hint = document.getElementById('voiceStatusHint');
+                    if (hint) {
+                        hint.classList.add('active');
+                        hint.innerHTML = 'Con chưa nghe rõ, mẹ bấm lại nút "Bấm nói" hoặc dùng Micro trên bàn phím nhé!';
+                        setTimeout(() => { hint.classList.remove('active'); }, 4000);
                     }
-                    setTimeout(() => { hint.classList.remove('active'); }, 4000);
                 }
             };
 
             recog.onend = function() {
+                let duration = Date.now() - voiceStartTime;
                 stopVoiceRecognition();
+                // Failsafe: Nếu bị iOS Standalone ngắt ngay lập tức (< 500ms) mà chưa nói gì
+                if (!voiceHasSpoken && duration < 500) {
+                    showIosKeyboardMicGuide();
+                }
             };
 
             return recog;
@@ -924,7 +935,62 @@
             }
         }
 
+        function showIosKeyboardMicGuide() {
+            const itemNameInput = document.getElementById('itemName');
+            if (itemNameInput) {
+                itemNameInput.focus();
+            }
+            const hint = document.getElementById('voiceStatusHint');
+            if (hint) {
+                hint.classList.add('active');
+                hint.innerHTML = '👉 <b>Mẹ bấm vào hình Micro 🎙️ ở góc dưới bàn phím iPhone</b> (cạnh dấu cách) để nói nhé! Nhận giọng nói tiếng Việt chuẩn 100% luôn ạ.';
+                setTimeout(() => { hint.classList.remove('active'); }, 8000);
+            }
+        }
+
+        // Tự động phân tách tên món và giá tiền khi mẹ nói bằng micro bàn phím iPhone
+        let nameInputTimer = null;
+        function onNameInputChanged(input) {
+            clearTimeout(nameInputTimer);
+            nameInputTimer = setTimeout(() => {
+                let val = input.value.trim();
+                if (!val) return;
+                let parsed = extractNameAndPrice(val);
+                if (parsed.price !== null) {
+                    if (parsed.name) {
+                        input.value = capitalizeFirst(parsed.name);
+                    } else {
+                        input.value = '';
+                    }
+                    const priceInput = document.getElementById('itemPrice');
+                    if (priceInput) {
+                        priceInput.value = formatNumberWithCommas(parsed.price);
+                        priceInput.focus();
+                    }
+                    const hint = document.getElementById('voiceStatusHint');
+                    if (hint) {
+                        hint.classList.add('active');
+                        let msg = '✅ ';
+                        if (input.value) msg += `Tên: <b>${input.value}</b> | `;
+                        msg += `Giá: <b>${formatMoney(parsed.price)}</b>`;
+                        hint.innerHTML = msg;
+                        setTimeout(() => { hint.classList.remove('active'); }, 4000);
+                    }
+                }
+            }, 700);
+        }
+
         function toggleVoiceRecognition() {
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+
+            // Nếu chạy trên iPhone ở chế độ App Màn hình chính (Standalone PWA)
+            // Do Apple Bug 225298: Web Speech API bị Apple khóa trong Standalone PWA
+            if (isIOS && isStandalone) {
+                showIosKeyboardMicGuide();
+                return;
+            }
+
             if (isRecording) {
                 stopVoiceRecognition();
                 return;
@@ -935,7 +1001,7 @@
             }
 
             if (!recognition) {
-                alert('Tính năng giọng nói chạy tốt nhất trên Safari iOS (iPhone) hoặc Chrome/Edge. Mẹ mở bằng Safari trên iPhone để dùng nhé!');
+                showIosKeyboardMicGuide();
                 return;
             }
 
@@ -944,6 +1010,7 @@
             } catch (e) {
                 console.error(e);
                 stopVoiceRecognition();
+                showIosKeyboardMicGuide();
             }
         }
 
